@@ -1,0 +1,14 @@
+user_config_override_sample.h:
+
+ dice: USAGE:
+    To modify the stock configuration without changing the my_user_config.h file:
+    (1) copy this file to "user_config_override.h" (It will be ignored by Git)
+    (2) define your own settings below
+ ... o sea, que no tocar my_user_config.h
+ 
+ ver también el ATTENTION 
+
+my_user_config.h:
+
+ define dos SECTIONs de configuración: lo que va en la primera es lo que se graba
+ en flash cuando se cambia mediante comandos

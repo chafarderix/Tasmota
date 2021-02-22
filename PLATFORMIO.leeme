@@ -14,7 +14,7 @@ prompt pa que no ze te orvíe;
 
   ... ediciones y eso
 
-  pip run   # que construye el o los paquetes definidos
+  pio run   # que construye el o los paquetes definidos
 
   deactivate    # ... y desaparece el prompt
 
