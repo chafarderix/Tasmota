@@ -1,0 +1,119 @@
+
+Remote Device Mode es una feature de los pwm dimmer switches, que necesita
+a su vez de device groups.
+
+
+RFC2365: Administratively Scoped IP Multicast
+
+range: 239.0.0.0/8
+organization local scope: 239.192.0.0/14
+local scope: 239.255.0.0/16
+
+
+Usos de UDP localizados:
+
+######## ./lib/libesp32/rtsp/platglue-esp32.h:
+
+typedef WiFiUDP *UDPSOCKET;
+
+######## .tasmota/tasmota.ino:
+
+WiFiUDP PortUdp;                            // UDP Syslog and Alexa
+
+
+######## ./tasmota/support_udp.ino:
+
+usa PortUdp, de tasmota.ino, y está orientado a Alexa y upnp/ssdp
+bool UdpDisconnect(void) { }
+bool UdpConnect(void) { }
+void PollUdp(void) {
+  // la mayor parte es el manejo de lo recibido, mas que obtener lo recibido
+}
+
+######## ./tasmota/support_wifi.ino:
+
+uint32_t WifiGetNtp(void) {
+  WiFiUDP udp;
+  // lo usa para temas ntp
+}
+
+######## ./tasmota/xdrv_10_scripter.ino:
+
+#ifdef USE_SCRIPT_GLOBVARS
+IPAddress last_udp_ip;
+WiFiUDP Script_PortUdp;
+...
+#endif //USE_SCRIPT_GLOBVARS
+
+#ifdef USE_SCRIPT_GLOBVARS
+#define SCRIPT_UDP_BUFFER_SIZE 128
+#define SCRIPT_UDP_PORT 1999
+IPAddress script_udp_remote_ip;
+...
+void Script_PollUdp(void) {
+  // la mayor parte es el manejo de lo recibido, mas que obtener lo recibido
+}
+void script_udp_sendvar(char *vname,float *fp,char *sp) {
+  host: 239.255.255.250
+}
+#endif
+
+######## ./tasmota/my_user_config.h:
+
+#define DEVICE_GROUPS_ADDRESS 239,255,250,250  // Device groups multicast address
+
+######## ./tasmota/support_device_groups.ino:
+
+parece implementar un multicast a DEVICE_GROUPS_ADDRESS combinado con ack individual de quienes reciben
+
+- en xdrv_20_hue.ino se usa, _probablemente_ para alexa
+
+Esta es la salida de find ./ -name *.ino -exec grep -H UDP '{}' \;
+
+./tasmota/xdrv_20_hue.ino:  // Do not use AddLog_P( here (interrupt routine) if syslog or mqttlog is enabled. UDP/TCP will force exception 9
+./tasmota/support.ino:    delay(1);  // Add time for UDP handling (#5512)
+./tasmota/support_udp.ino:#ifndef UDP_BUFFER_SIZE
+./tasmota/support_udp.ino:#define UDP_BUFFER_SIZE         120      // Max UDP buffer size needed for M-SEARCH message
+./tasmota/support_udp.ino:#define UDP_MSEARCH_SEND_DELAY  1500     // Delay in ms before M-Search response is send
+./tasmota/support_udp.ino:#ifndef UDP_MAX_PACKETS
+./tasmota/support_udp.ino:#define UDP_MAX_PACKETS   3             // we support x more packets than the current one
+./tasmota/support_udp.ino:UdpListener<UDP_BUFFER_SIZE> UdpCtx(UDP_MAX_PACKETS);
+./tasmota/support_udp.ino: * UDP support routines
+./tasmota/support_udp.ino:    WiFiUDP::stopAll();
+./tasmota/support_udp.ino:      UdpPacket<UDP_BUFFER_SIZE> *packet;
+./tasmota/support_udp.ino:      if (packet->len >= UDP_BUFFER_SIZE) {
+./tasmota/support_udp.ino:      char packet_buffer[UDP_BUFFER_SIZE];     // buffer to hold incoming UDP/SSDP packet
+./tasmota/support_udp.ino:      int32_t len = PortUdp.read(packet_buffer, UDP_BUFFER_SIZE -1);
+./tasmota/support_udp.ino:      AddLog_P(LOG_LEVEL_DEBUG_MORE, PSTR("UDP: Packet (%d)"), len);
+./tasmota/support_udp.ino:          // AddLog_P(LOG_LEVEL_DEBUG_MORE, PSTR("UDP: M-SEARCH Packet from %s:%d\n%s"),
+./tasmota/support_udp.ino:          uint32_t response_delay = UDP_MSEARCH_SEND_DELAY + ((millis() &0x7) * 100);  // 1500 - 2200 msec
+./tasmota/support_wifi.ino:  WiFiUDP udp;
+./tasmota/support_wifi.ino:    uint32_t port = random(1025, 65535);   // Create a random port for the UDP connection.
+./tasmota/xdrv_81_webcam.ino:            rtsp_streamer = new OV2640Streamer(&rtsp_client, cam);        // our streamer for UDP/TCP based RTP transport
+./tasmota/xdrv_10_scripter.ino:} UDP_FLAGS;
+./tasmota/xdrv_10_scripter.ino:    UDP_FLAGS udp_flags;
+./tasmota/xdrv_10_scripter.ino:WiFiUDP Script_PortUdp;
+./tasmota/xdrv_10_scripter.ino:      Script_Init_UDP();
+./tasmota/xdrv_10_scripter.ino:#define SCRIPT_UDP_BUFFER_SIZE 128
+./tasmota/xdrv_10_scripter.ino:#define SCRIPT_UDP_PORT 1999
+./tasmota/xdrv_10_scripter.ino:  Script_Stop_UDP();
+./tasmota/xdrv_10_scripter.ino:  Script_Init_UDP();
+./tasmota/xdrv_10_scripter.ino:void Script_Stop_UDP(void) {
+./tasmota/xdrv_10_scripter.ino:void Script_Init_UDP() {
+./tasmota/xdrv_10_scripter.ino:  if (Script_PortUdp.beginMulticast(WiFi.localIP(), IPAddress(239,255,255,250), SCRIPT_UDP_PORT)) {
+./tasmota/xdrv_10_scripter.ino:    AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_UPNP "SCRIPT UDP started"));
+./tasmota/xdrv_10_scripter.ino:    AddLog_P(LOG_LEVEL_DEBUG, PSTR(D_LOG_UPNP "SCRIPT UDP failed"));
+./tasmota/xdrv_10_scripter.ino:      char packet_buffer[SCRIPT_UDP_BUFFER_SIZE];
+./tasmota/xdrv_10_scripter.ino:      int32_t len = Script_PortUdp.read(packet_buffer, SCRIPT_UDP_BUFFER_SIZE - 1);
+./tasmota/xdrv_10_scripter.ino:      AddLog_P(LOG_LEVEL_DEBUG, PSTR("UDP: Packet %s - %d - %s"), packet_buffer, len, script_udp_remote_ip.toString().c_str());
+./tasmota/xdrv_10_scripter.ino:    Script_Init_UDP();
+./tasmota/xdrv_10_scripter.ino:  Script_PortUdp.beginPacket(IPAddress(239, 255, 255, 250), SCRIPT_UDP_PORT);
+./tasmota/xdrv_10_scripter.ino:  Script_Stop_UDP();
+./tasmota/xdrv_10_scripter.ino:      Script_Stop_UDP();
+./tasmota/support_rtc.ino:    // Do not use AddLog_P( here (interrupt routine) if syslog or mqttlog is enabled. UDP/TCP will force exception 9
+./tasmota/support_rtc.ino:    // Do not use AddLog_P( here (interrupt routine) if syslog or mqttlog is enabled. UDP/TCP will force exception 9
+./tasmota/tasmota.ino:WiFiUDP PortUdp;                            // UDP Syslog and Alexa
+./tasmota/xdrv_21_wemo.ino:  // Do not use AddLog_P( here (interrupt routine) if syslog or mqttlog is enabled. UDP/TCP will force exception 9
+./tasmota/support_device_groups.ino:WiFiUDP device_groups_udp;
+./tasmota/xdrv_21_wemo_multi.ino:    // Do not use AddLog_P here (interrupt routine) if syslog or mqttlog is enabled. UDP/TCP will force exception 9
+./lib/lib_basic/IRremoteESP8266-2.7.13/examples/IRMQTTServer/IRMQTTServer.ino:          WiFiUDP::stopAll();

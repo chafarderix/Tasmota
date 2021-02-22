@@ -1,0 +1,36 @@
+Como platformio no parece estar en debian, lo he instalado como recomiendan en su
+https://docs.platformio.org/en/latest/core/installation.html#installer-script
+que te crea un venv de python en ~/.platformio/penv.
+
+Pa trabajar en ese venv hay que hacer 'source' a bin/activate, que prepara el
+shell en el que se ejecuta para que python trabaje con eso ... y que cambia el
+prompt pa que no ze te orvíe;
+
+  . ~/.platformio/penv/bin/activate
+
+  cd ~/git/Tasmota
+
+  pio home    # y voilá, se te abre una ventana de navegador 
+
+  ... ediciones y eso
+
+  pip run   # que construye el o los paquetes definidos
+
+  deactivate    # ... y desaparece el prompt
+
+- - - -
+
+Configuraciones de firmware:
+
+en pio se llama environments a distintas configuraciones de firmware; de entre
+las que hay definidas, se puede especificar cuáles construir con pio run
+
+* platfformio.ini - fichero raíz de configuración
+
+	desde ahí se incluyen platformio_tasmota_env.ini y platformio_tasmota_override.ini
+
+* platformio_tasmota_env.ini				- define las configuraciones de firmware upstream
+
+* platformio_tasmota_override.ini		-	para definir custom firmwares y cuáles se construyen de entre los upstream
+																			y custom; p.def no existe: el modelo es platformio_tasmota_override_sample.ini
+	
