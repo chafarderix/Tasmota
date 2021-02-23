@@ -12,3 +12,104 @@ my_user_config.h:
 
  define dos SECTIONs de configuración: lo que va en la primera es lo que se graba
  en flash cuando se cambia mediante comandos
+
+ en la segunda van los defines para habilitar / deshabilitar features
+
+ y, al final:
+ 
+ #ifdef USE_CONFIG_OVERRIDE // que está definido siempre en platformio.ini
+   #include "user_config_override.h"         // Configuration overrides for my_user_config.h
+ #endif
+
+tamaños:
+
+ 601K tasmota.bin
+
+ 601K tasmota-pepe-custom.bin con script
+ 603K tasmota-pepe-custom.bin con script + globvars
+ => ~2K las globvars
+
+NETVARS:
+
+ Igual que hay una iface sensors ( https://tasmota.github.io/docs/Sensor-API/ ),
+ que integra los módulos xsns_nn_name.ino, hay tb una iface idéntica que integra
+ los módulos xdrv_nn_name.
+
+ Entre ellos estan xdrv_10_rules.ino y xdrv_10_scripter.ini => como son alternativos,
+ comparten el mismo número. Eso es importante, pq la iface almacena la función que
+ implementa el 'driver' en una matriz de punteros a función, y ese número es el lugar
+ que ocupa en esa matriz.
+
+ Para definir la iface, un módulo se asegura de contar con número no ocupado y hace:
+
+ #define XDRV_nn
+ bool Xdrvnn(uint8_t function) {
+ ...
+ }
+
+ Ahora mismo estan libres del 47 al 80, incluídos, pero una buena opción sería hacerlo
+ alternativo a xdrv_11_knx.ino, O SEA: xdrv_11_udpvars.ino
+
+IDEA:
+
+ Aunque nos inspiramos en script_globvars, las hacemos independientes: no sacamos de
+ scripter su implementación, sino que hacemos algo paralelo.
+
+ Por lo pronto, habrá que implementar al menos un comando para definir variables y
+ otro para modificarlas localmente (lo que disparará la difusión del cambio vía udp):
+
+ Xdrv11(uint8_t func) {
+ 	 switch (func) {
+	   case FUNC_COMMAND: (Hay montones de ejemplos x ahí)
+	 }
+ }
+
+COMANDOS NETVARS
+
+ Los drivers declaran sus propios comandos. P.e. KNX:
+
+ - declara const char kKnxCommands[] PROGMEM = <lista de comandos separados x '|'>, donde
+   lógicamente interesa tener un prefijo común para evitar colisiones.
+ - implementa varias void CmndKnxXXCmnd(void) { } para ejecutarlos (tiene el comando en XdrvMailbox)
+ - declara y rellena void (* const KnxCommand[])(void) PROGMEM = <lista de punteros a funciones>
+   en el mismo orden que metió la lista de cadenas en kKnxCommands
+ - en la función-interface (Xdrv11()), utiliza kKnxCommands y xKnxCommand[] para llamar a
+   DecodeCommand(), que es quien acaba ejecutandolo.
+
+ La llamada a la función interface con FUNC_COMMAND se hace desde CommandHandler(), mediante
+ llamada a XdrvCall() (en xdrv_interface.ino()) cuando no encuentra el comando entre los suyos propios.
+
+UDP MULTICAST:
+
+ Multicast no es broadcast: los paquetes se distribuyen a quienes se suscriben a
+ un servicio; la suscripción se hace mediante IGMP en forma de IP+puerto. Para ello,
+ existen rangos de IPs para multicast:
+ 
+ host-local: 224.0.0.0/24
+
+ RFC2365: Administratively Scoped IP Multicast:
+
+  range: 239.0.0.0/8
+  organization local scope: 239.192.0.0/14 (~ >= de 239.192.0.1) LAN
+  local scope: 239.255.0.0/16 imagino que es host local
+
+ Para suscribirse a un grupo multicast, se usa IGMP ( https://en.wikipedia.org/wiki/Internet_Group_Management_Protocol )
+ En support_udp.ino se usa la función igmp_joingroup(), que estará x ahí en alguna librería.
+
+ Para testear, puede que sea útil nc; he probado nc -lub -p 5353 (pto de mdns) y
+ en otro terminal avahi-publish -s myservice _http._tcp 1234 y nc lo recibe
+
+ Pero lo mejor creo que va a ser socat:
+
+ 	 socat UDP4-RECVFROM:9200,ip-add-membership=239.220.221.10:eno1
+
+   ... escucha en puerto 9200 paquetes UDP IPv4, a la vez que se registra (IGMP)
+	 como interesado en multicast dirigido a 239..220.221.10, habilitado en iface
+	 eno1
+
+ y también puede enviar:
+
+  socat - UDP4-DATAGRAM:224.255.0.1:6666,bind=:6666,ip-add-membership=224.255.0.1:eno1
+
+  ... en realidad eso envía y recibe (cogido de man socat): no sé si la membresía
+	será necesaria solo para enviar

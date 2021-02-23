@@ -3,13 +3,6 @@ Remote Device Mode es una feature de los pwm dimmer switches, que necesita
 a su vez de device groups.
 
 
-RFC2365: Administratively Scoped IP Multicast
-
-range: 239.0.0.0/8
-organization local scope: 239.192.0.0/14
-local scope: 239.255.0.0/16
-
-
 Usos de UDP localizados:
 
 ######## ./lib/libesp32/rtsp/platglue-esp32.h:
@@ -29,6 +22,8 @@ bool UdpConnect(void) { }
 void PollUdp(void) {
   // la mayor parte es el manejo de lo recibido, mas que obtener lo recibido
 }
+IMPORTANTE: usa igmp_joingroup(WiFi.localIP(), IPAddress(239,255,255,250))
+=> necesario para recibir multicast
 
 ######## ./tasmota/support_wifi.ino:
 
@@ -65,8 +60,12 @@ void script_udp_sendvar(char *vname,float *fp,char *sp) {
 ######## ./tasmota/support_device_groups.ino:
 
 parece implementar un multicast a DEVICE_GROUPS_ADDRESS combinado con ack individual de quienes reciben
+Esto ( https://tasmota.github.io/docs/Device-Groups/ ) es para agrupar dispositivos que se quieren
+actuar en conjunto
 
-- en xdrv_20_hue.ino se usa, _probablemente_ para alexa
+en xdrv_20_hue.ino se usa, _probablemente_ para alexa
+
+- - - - - -
 
 Esta es la salida de find ./ -name *.ino -exec grep -H UDP '{}' \;
 
